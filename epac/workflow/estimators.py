@@ -30,7 +30,7 @@ It is a user-defined object that should implements 4 methods:
 import re
 import numpy as np
 import copy
-from epac.workflow.base import BaseNode, xy_split, key_push
+from epac.workflow.base import BaseNode, xy_split, key_push, key_split
 from epac.utils import _func_get_args_names
 from epac.utils import _sub_dict, _as_dict
 from epac.results import ResultSet, Result
@@ -197,31 +197,32 @@ class CVBestSearchRefit(Estimator):
             % self.__class__.__name__)
         cv.fit_predict(recursion=True, **Xy)
         #  Pump-up results
-        methods = list()
         cv_result_set = cv.reduce(store_results=True)
         key_val = [(result.key(), result[self.score]) for result in cv_result_set]
         mean_cv = np.asarray(zip(*key_val)[1])
         mean_cv_opt = np.max(mean_cv) if self.arg_max else  np.min(mean_cv)
         idx_best = np.where(mean_cv == mean_cv_opt)[0][0]
         best_signature = key_val[idx_best][0]
+        pipeline = Pipe(*[eval(m) for m in key_split(best_signature)])
         
-        if debug.DEBUG:
-            debug.current = self
-            debug.Xy = Xy
-        cv_grid_search_results = cv_grid_search.load_state(name="results")
-        cv_grid_search.store = None
-        for key2 in cv_grid_search_results:
-            pipeline = self.cv_grid_search(key2=key2,
-                                           result=cv_grid_search_results[key2],
-                                           cv_node=cv_grid_search)
-            methods.append(pipeline)
-        # Add children
-        from epac.workflow.splitters import Methods
-        to_refit = Methods(*methods)
-        to_refit.store = StoreMem()    # local store erased at each fit
+#        
+#        if debug.DEBUG:
+#            debug.current = self
+#            debug.Xy = Xy
+#        cv_grid_search_results = cv_grid_search.load_state(name="results")
+#        cv_grid_search.store = None
+#        for key2 in cv_grid_search_results:
+#            pipeline = self.cv_grid_search(key2=key2,
+#                                           result=cv_grid_search_results[key2],
+#                                           cv_node=cv_grid_search)
+#            methods.append(pipeline)
+#        # Add children
+#        from epac.workflow.splitters import Methods
+#        to_refit = Methods(*methods)
+        pipeline.store = StoreMem()    # local store erased at each fit
         self.children = self.children[:1]
-        self.add_child(to_refit)
-        to_refit.fit(recursion=True, **Xy)
+        self.add_child(pipeline)
+        pipeline.fit(recursion=True, **Xy)
         #to_refit.bottum_up(store_results=False)
         # Delete (eventual) about previous refit
         return self

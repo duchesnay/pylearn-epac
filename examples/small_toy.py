@@ -15,7 +15,10 @@ X, y = datasets.make_classification(n_samples=12, n_features=10,
 
 # Model selection using CV: CV + Grid
 # -----------------------------------------
-from epac import Grid, Pipe, CVBestSearchRefit, StoreMem
+from epac import Grid, Pipe, CVBestSearchRefit, StoreMem, Methods
+anovas_svm = Methods(*[Pipe(SelectKBest(k=k), SVC(C=C)) for k in [1, 2] for C in [1, 10]])
+self = CVBestSearchRefit(anovas_svm)
+
 Xy=dict(X=X, y=y)
 # CV + Grid search of a simple classifier
 self = CVBestSearchRefit(*[SVC(C=C) for C in [1, 10]])
