@@ -15,8 +15,9 @@ import collections
 import numpy as np
 import copy
 
-from epac.workflow.base import BaseNode
+from epac.workflow.base import BaseNode, key_push, key_pop
 from epac.workflow.estimators import Estimator
+from epac.results import Result, ResultSet
 from epac.utils import _list_indices, dict_diff, _sub_dict
 from epac.reducers import SummaryStat, PvalPerms
 
@@ -38,6 +39,34 @@ class BaseNodeSplitter(BaseNode):
     """
     def __init__(self):
         super(BaseNodeSplitter, self).__init__()
+
+    def reduce(self, store_results=True):
+        # Terminaison (leaf) node return results
+        if not self.children:
+            return self.load_state(name="results")
+        # 1) Build sub-aggregates over children
+        children_results = [child.reduce(store_results=False) for
+            child in self.children]
+        results = ResultSet(children_results)
+        if not self.reducer:
+            return results
+        # Group by key, without consideration of the fold/permutation number
+        # which is the head of the key
+        groups = dict()
+        for result in results:
+            # remove the head of the key
+            _, key_tail = key_pop(result["key"], index=0)
+            result["key"] = key_tail
+            key_tail = result["key"]
+            if not key_tail in groups:
+                groups[key_tail] = list()
+            groups[key_tail].append(result)
+        # For each key, stack results
+        reduced = ResultSet()
+        for key in groups:
+            result_stacked = Result.stack(groups[key])
+            reduced.add(self.reducer.reduce(result_stacked))
+        return reduced
 
 
 class CV(BaseNodeSplitter):
@@ -65,7 +94,7 @@ class CV(BaseNodeSplitter):
     SUFFIX_TRAIN = "train"
     SUFFIX_TEST = "test"
 
-    def __init__(self, node, n_folds=5, random_state=None, 
+    def __init__(self, node, n_folds=5, random_state=None,
                  cv_type="stratified", reducer=SummaryStat(), **kwargs):
         super(CV, self).__init__()
         self.n_folds = n_folds
@@ -77,7 +106,7 @@ class CV(BaseNodeSplitter):
         self.add_child(slicer)
         subtree = node if isinstance(node, BaseNode) else Estimator(node)
         slicer.add_child(subtree)
-        
+
     def move_to_child(self, nb, slicer):
         slicer.set_nb(nb)
         if hasattr(self, "_sclices"):
@@ -200,7 +229,8 @@ class Methods(BaseNodeSplitter):
         super(Methods, self).__init__()
         for node in nodes:
             node_cp = copy.deepcopy(node)
-            node_cp = node_cp if isinstance(node_cp, BaseNode) else Estimator(node_cp)
+            node_cp = node_cp if isinstance(node_cp, BaseNode) else \
+                Estimator(node_cp)
             self.add_child(node_cp)
         curr_nodes = self.children
         leaves_key = [l.get_key() for l in self.walk_leaves()]
@@ -227,6 +257,13 @@ class Methods(BaseNodeSplitter):
         if len(leaves_key) != len(set(leaves_key)):
             raise ValueError("Some methods are identical, they could not be "
                     "differentiated according to their arguments")
+
+    def reduce(self, store_results=True):
+        # 1) Build sub-aggregates over children
+        children_results = [child.reduce(store_results=False) for
+            child in self.children]
+        results = ResultSet(children_results)
+        return results
 
 
 class Grid(Methods):
@@ -295,6 +332,12 @@ class Slicer(BaseNode):
     def get_signature_args(self):
         """overried get_signature_args to return a copy"""
         return copy.copy(self.signature_args)
+
+    def reduce(self, store_results=True):
+        results = ResultSet([self.children[0].reduce(store_results=False)])
+        for result in results:
+            result["key"] = key_push(self.get_signature(), result["key"])
+        return results
 
 
 class RowSlicer(Slicer):

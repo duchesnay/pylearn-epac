@@ -13,6 +13,17 @@ from sklearn.feature_selection import SelectKBest
 X, y = datasets.make_classification(n_samples=12, n_features=10,
                                     n_informative=2)
 
+# Model selection using CV: CV + Grid
+# -----------------------------------------
+from epac import Grid, Pipe, CVBestSearchRefit, StoreMem
+Xy=dict(X=X, y=y)
+# CV + Grid search of a simple classifier
+self = CVBestSearchRefit(*[SVC(C=C) for C in [1, 10]])
+self.fit(X=X, y=y)
+self.fit_predict(X=X, y=y)
+wf.reduce()
+
+
 # Build sequential Pipeline
 # -------------------------
 # 2  SelectKBest (Estimator)
@@ -46,7 +57,7 @@ pipe.fit_predict(X=X, y=y)  # Do both
 from epac import Methods
 multi = Methods(SVC(C=1), SVC(C=10))
 multi.fit_predict(X=X, y=y)
-multi.reduce()
+print multi.reduce()
 
 
 #        Methods          Methods (Splitter)
@@ -54,6 +65,7 @@ multi.reduce()
 # SVM(linear)  SVM(rbf)  Classifiers (Estimator)
 svms = Methods(*[SVC(kernel=kernel) for kernel in ("linear", "rbf")])
 svms.fit_predict(X=X, y=y)
+print svms.reduce()
 
 # Parallelize sequential Pipeline: Anova(k best selection) + SVM.
 #    Methods    Methods (Splitter)
@@ -63,66 +75,57 @@ svms.fit_predict(X=X, y=y)
 # SVM SVM SVM   Classifiers (Estimator)
 anovas_svm = Methods(*[Pipe(SelectKBest(k=k), SVC()) for k in [1, 2]])
 anovas_svm.fit_predict(X=X, y=y)
-anovas_svm.reduce()
+print anovas_svm.reduce()
 
 
-# Parallelize SVM with several parameters.
-# Collisions between upstream keys, trig aggretation.
-#                   Grid                Grid (Splitter)
-#                  /     \
-# SVM(linear, C=1)  .... SVM(rbf, C=10) Classifiers (Estimator)
-# Grid and PArMethods differ onlys the way they process the upstream
-# flow. With Grid Children differs only by theire arguments, and thus
-# are aggregated toggether
-from epac import Grid
-svms = Grid(SVC(C=1), SVC(C=10))
-svms.fit_predict(X=X, y=y)
-svms.reduce()
+## Parallelize SVM with several parameters.
+## Collisions between upstream keys, trig aggretation.
+##                   Grid                Grid (Splitter)
+##                  /     \
+## SVM(linear, C=1)  .... SVM(rbf, C=10) Classifiers (Estimator)
+## Grid and PArMethods differ onlys the way they process the upstream
+## flow. With Grid Children differs only by theire arguments, and thus
+## are aggregated toggether
+#from epac import Grid
+#svms = Grid(SVC(C=1), SVC(C=10))
+#svms.fit_predict(X=X, y=y)
+#svms.reduce()
+#
+## Two parameters
+#svms = Grid(*[SVC(kernel=kernel, C=C) for kernel in ("linear", "rbf")
+#    for C in [1, 10]])
+#svms.fit_predict(X=X, y=y)
+#svms.reduce()
 
-# Two parameters
-svms = Grid(*[SVC(kernel=kernel, C=C) for kernel in ("linear", "rbf")
-    for C in [1, 10]])
-svms.fit_predict(X=X, y=y)
-svms.reduce()
 
 # Cross-validation
 # ----------------
 # CV of LDA
-#    CV                (Splitter)
+#      CV                 (Splitter)
 #  /   |   \
 # 0    1    2  Folds      (Slicer)
-# |    |    |
-# LDA LDA LDA  Classifier (Estimator)
-from epac import CV
-from epac import SummaryStat
-cv_lda = CV(LDA())
-cv_lda.fit_predict(X=X, y=y)
-cv_lda.reduce()
-
-
-# A CV node is a Splitter: it as one child per fold. Each child is a slicer
-# ie.: it re-slices the downstream data-flow according into train or test
-# sample. When it is called with "fit" it uses the train samples. When it is
-# called with "predict" it uses the test samples.
-# If it is called with transform, user has to precise wich sample to use. To
-# do that just add a argument sample_set="train" or "test" in the downstream
-# data-flow. This argument will be catched by the slicer.
-cv_lda.transform(X=X, y=y, sample_set="train")
-cv_lda.transform(X=X, y=y, sample_set="test")
+# |    |
+#   Methods               (Splitter)
+#    /   \
+#  LDA  SVM    Classifier (Estimator)
+from epac import CV, Methods
+cv = CV(Methods(LDA(), SVC(kernel="linear")))
+cv.fit_predict(X=X, y=y)
+print cv.reduce()
 
 
 # Model selection using CV: CV + Grid
 # -----------------------------------------
-from epac import Grid, Pipe, CVGridSearchRefit
+from epac import Grid, Pipe, CVBestSearchRefit
 # CV + Grid search of a simple classifier
-wf = CVGridSearchRefit(*[SVC(C=C) for C in [1, 10]])
+wf = CVBestSearchRefit(*[SVC(C=C) for C in [1, 10]])
 wf.fit_predict(X=X, y=y)
 wf.reduce()
 
 # CV + Grid search of a pipeline with a nested grid search
 methods = [Pipe(SelectKBest(k=k), Grid(*[SVC(C=C) for C in [1, 10]]))
                 for k in [1, 5]]
-wf = CVGridSearchRefit(*methods)
+wf = CVBestSearchRefit(*methods)
 wf.fit_predict(X=X, y=y)
 wf.reduce()
 

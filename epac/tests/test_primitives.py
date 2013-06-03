@@ -104,20 +104,20 @@ class TestPerms(unittest.TestCase):
         self.assertTrue(comp, u'Diff Perm: EPAC vs sklearn')
 
         # test reduce
-        r_epac_reduce = wf.reduce().values()[0]['pred_te']
+        r_epac_reduce = [v['pred_te'] for v in wf.reduce().values()]
         comp = np.all(np.asarray(r_epac_reduce) == np.asarray(r_sklearn))
         self.assertTrue(comp, u'Diff Perm: EPAC reduce')
 
 
-class TestCVGridSearchRefit(unittest.TestCase):
-
-    def test_cvgridsearchrefit(self):
-        X, y = datasets.make_classification(n_samples=12, n_features=10, n_informative=2)
-        from epac import CVGridSearchRefit
-        # CV + Grid search of a simple classifier
-        wf = CVGridSearchRefit(*[SVC(C=C) for C in [1, 10]], n_folds=2)
-        wf.fit_predict(X=X, y=y)
-        wf.reduce()
+#class TestCVBestSearchRefit(unittest.TestCase):
+#
+#    def test2_cvgridsearchrefit(self):
+#        X, y = datasets.make_classification(n_samples=12, n_features=10, n_informative=2)
+#        from epac import CVBestSearchRefit
+#        # CV + Grid search of a simple classifier
+#        wf = CVBestSearchRefit(*[SVC(C=C) for C in [1, 10]], n_folds=2)
+#        wf.fit_predict(X=X, y=y)
+#        wf.reduce()
 
 class TestMethods(unittest.TestCase):
 

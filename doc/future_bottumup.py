@@ -27,9 +27,9 @@ self.reduce()
 """
 # Model selection using CV: CV + Grid
 # -----------------------------------------
-from epac import CVGridSearchRefit
+from epac import CVBestSearchRefit
 # CV + Grid search of a simple classifier
-wf = CVGridSearchRefit(*[SVC(C=C) for C in [1, 10]], n_folds=3)
+wf = CVBestSearchRefit(*[SVC(C=C) for C in [1, 10]], n_folds=3)
 wf.fit_predict(X=X, y=y)
 wf.reduce()
 """

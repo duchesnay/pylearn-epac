@@ -18,7 +18,7 @@ from sklearn.feature_selection import SelectKBest
 from epac import Pipe, Methods, CV, Perms
 from epac import SummaryStat, PvalPerms
 from epac import StoreFs
-from epac import CVGridSearchRefit, Grid
+from epac import CVBestSearchRefit, Grid
 from epac.sklearn_plugins import Permutations
 
 
@@ -31,7 +31,7 @@ class TestWorkFlow(unittest.TestCase):
         n_folds_nested = 3
         k_values = [1, 2]
         C_values = [1, 2]
-        pipeline = CVGridSearchRefit(*[
+        pipeline = CVBestSearchRefit(*[
                       Pipe(SelectKBest(k=k),
                           Grid(*[SVC(kernel="linear", C=C) for C in C_values]))
                       for k in k_values],

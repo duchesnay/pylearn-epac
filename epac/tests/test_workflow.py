@@ -14,7 +14,7 @@ import numpy as np
 from sklearn import datasets
 from sklearn.svm import SVC
 from sklearn.feature_selection import SelectKBest
-from epac import CVGridSearchRefit, Grid, Pipe, CV, Perms
+from epac import CVBestSearchRefit, Grid, Pipe, CV, Perms
 from epac import SummaryStat, PvalPerms
 from epac.sklearn_plugins import Permutations
 
@@ -62,7 +62,7 @@ class TestPermCV(unittest.TestCase):
             comp = np.all(np.asarray(r_epac_reduce) == np.asarray(r_sklearn))
             self.assertTrue(comp, u'Diff Perm / CV: EPAC reduce')
 
-class TestCVGridSearchRefit(unittest.TestCase):
+class TestCVBestSearchRefit(unittest.TestCase):
 
     def test_perm_cv_grid_vs_sklearn(self):
         X, y = datasets.make_classification(n_samples=100, n_features=500,
@@ -77,7 +77,7 @@ class TestCVGridSearchRefit(unittest.TestCase):
         # = With EPAC
         # ===================
         ## CV + Grid search of a pipeline with a nested grid search
-        pipeline = CVGridSearchRefit(*[
+        pipeline = CVBestSearchRefit(*[
                       Pipe(SelectKBest(k=k),
                           Grid(*[SVC(kernel="linear", C=C) for C in C_values]))
                       for k in k_values],

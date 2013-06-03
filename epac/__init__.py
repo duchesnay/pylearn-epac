@@ -8,15 +8,15 @@ Created on Wed Jan 23 13:58:21 2013
 
 from epac.workflow.pipeline import Pipe
 from epac.workflow.splitters import CV, Perms, Methods, Grid
-from epac.workflow.estimators import CVGridSearchRefit
+from epac.workflow.estimators import CVBestSearchRefit
 from epac.workflow.base import xy_split, xy_merge, key_pop
 from epac.configuration import conf, debug
-from epac.results import Results, Result
+from epac.results import ResultSet, Result
 from epac.utils import dict_diff, range_log2
 from epac.stores import StoreFs, StoreMem
 
 #from epac.workflow import WF, Pipe, CV, Perms, Methods, Grid
-#from epac.workflow import CVGridSearchRefit
+#from epac.workflow import CVBestSearchRefit
 #from epac.workflow import conf, debug
 #from epac.workflow import xy_split, xy_merge
 #from epac.utils import dict_diff
@@ -31,11 +31,11 @@ __all__ = ['Pipe',
            'Perms',
            'Grid',
            'Methods',
-           'CVGridSearchRefit',
+           'CVBestSearchRefit',
            'SummaryStat',
            'PvalPerms',
            'Result',
-           'Results',
+           'ResultSet',
            'sklearn_plugins',
            'conf',
            'debug',

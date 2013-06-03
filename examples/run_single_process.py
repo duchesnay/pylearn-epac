@@ -37,10 +37,10 @@ def do_all(options):
 
     ## 2) Build Workflow
     ## =================
-    from epac import Perms, CV, CVGridSearchRefit, Pipe, Grid
+    from epac import Perms, CV, CVBestSearchRefit, Pipe, Grid
     time_start = time.time()
     ## CV + Grid search of a pipeline with a nested grid search
-    pipeline = CVGridSearchRefit(*[
+    pipeline = CVBestSearchRefit(*[
                   Pipe(SelectKBest(k=k),
                       Grid(*[SVC(kernel="linear", C=C) for C in C_values]))
                   for k in k_values],

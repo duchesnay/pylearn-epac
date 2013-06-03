@@ -14,7 +14,7 @@ import ast
 from epac.utils import _list_union_inter_diff, _list_indices
 from epac.utils import _list_of_dicts_2_dict_of_lists
 from epac.stores import StoreMem
-from epac.results import Results
+from epac.results import ResultSet
 from epac.configuration import conf, debug
 
 
@@ -355,10 +355,10 @@ class BaseNode(object):
             curr = child
             yield curr
 
-    def get_path_from_node(self, node):
-        if self is node:
-            return [self]
-        return self.parent.get_path_from_node(node) + [self]
+#    def get_path_from_node(self, node):
+#        if self is node:
+#            return [self]
+#        return self.parent.get_path_from_node(node) + [self]
 
     # --------------------- #
     # -- Key             -- #
@@ -526,13 +526,17 @@ class BaseNode(object):
     # -- Bottum-up data-flow operations (reduce) -- #
     # --------------------------------------------- #
 
-    def bottum_up(self, store_results=True):
+    def bottum_up2(self, store_results=True):
         # Terminaison (leaf) node return results
         if not self.get_children_bottum_up():
             return self.load_state(name="results")
         # 1) Build sub-aggregates over children
         children_results = [child.bottum_up(store_results=False) for
             child in self.get_children_bottum_up()]
+        results = ResultSet(children_results)
+        for result in results:
+            result["key"] = key_push(self.get_signature(), result["key"])
+        #
         if debug.DEBUG:
             debug.current = self
         if len(children_results) == 1:
@@ -547,7 +551,7 @@ class BaseNode(object):
             keys_set.update(r.keys())
         # 3) No collision: merge results in a lager dict an return
         if len(keys_set) == len(keys_all):
-            merge = Results()
+            merge = ResultSet()
             [merge.update(item) for item in children_results]
             if store_results:
                 self.save_state(state=merge, name="results")
@@ -599,7 +603,7 @@ class BaseNode(object):
                                                  axis_values=arg_values)
         return arg_names, arg_values, stacked
 
-    reduce = bottum_up
+    #reduce = bottum_up
 
     def get_children_bottum_up(self):
         """Return children during the bottum-up execution."""

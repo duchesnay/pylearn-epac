@@ -30,12 +30,13 @@ It is a user-defined object that should implements 4 methods:
 import re
 import numpy as np
 import copy
-from epac.workflow.base import BaseNode, xy_split
+from epac.workflow.base import BaseNode, xy_split, key_push
 from epac.utils import _func_get_args_names
 from epac.utils import _sub_dict, _as_dict
-from epac.results import Results, Result
+from epac.results import ResultSet, Result
 from epac.stores import StoreMem
 from epac.configuration import debug
+from epac.reducers import SummaryStat
 
 ## ================================= ##
 ## == Wrapper node for estimators == ##
@@ -83,8 +84,11 @@ class Estimator(BaseNode):
         self.estimator.fit(**Xy_dict)
         if not self.children:  # if not children compute scores
             score = self.estimator.score(**Xy_dict)
-            res = Results(key2=self.get_key(2), suffix=Result.TRAIN, score=score)
-            self.save_state(res, name="results")
+            result = Result(key=self.get_signature())
+            result[Result.SCORE, Result.TRAIN] = score
+            results = ResultSet()
+            results.add(result)
+            self.save_state(results, name="results")
         if self.children:  # transform downstream data-flow (ds) for children
             return self.transform(recursion=False, **Xy)
         else:
@@ -115,9 +119,8 @@ class Estimator(BaseNode):
         X_dict = _sub_dict(Xy, self._args_predict)
         pred = self.estimator.predict(**X_dict)
         # load previous train results and store test results
-        res = self.load_state("results")
-        key2 = self.get_key(2)
-        res.add(key2=key2, suffix=Result.TEST, pred=pred)
+        result = self.load_state("results")[self.get_signature()]
+        result[Result.PRED, Result.TEST] = pred
         # If true data (args in fit but not in predict) is provided then
         # add it to results plus compute score
         arg_only_in_fit = set(self._args_fit).difference(set(self._args_predict))
@@ -125,14 +128,25 @@ class Estimator(BaseNode):
             if len(arg_only_in_fit) != 1:
                 raise ValueError("Do not know how to deal with more than one "
                     "result")
-            res.add(key2, suffix=Result.TEST,
-                    true=Xy[arg_only_in_fit.pop()],
-                    score=self.estimator.score(**Xy))
-        self.save_state(state=res, name="results")
+            result[Result.TRUE, Result.TEST] = Xy[arg_only_in_fit.pop()]
+            result[Result.SCORE, Result.TEST] = self.estimator.score(**Xy)
         return pred
 
+    def reduce(self, store_results=True):
+        # Terminaison (leaf) node return results
+        if not self.children:
+            return self.load_state(name="results")
+        # 1) Build sub-aggregates over children
+        children_results = [child.reduce(store_results=False) for
+            child in self.children]
+        results = ResultSet(children_results)
+        # Append node signature in the keys
+        for result in results:
+            result["key"] = key_push(self.get_signature(), result["key"])
+        return results
 
-class CVGridSearchRefit(Estimator):
+
+class CVBestSearchRefit(Estimator):
     """Cross-validation + grid-search then refit with optimals parameters.
 
     Average results over first axis, then find the arguments that maximize or
@@ -143,9 +157,8 @@ class CVGridSearchRefit(Estimator):
 
     See CV parameters, plus other parameters:
 
-    key3: str
-        a regular expression that match the score name to be optimized.
-        Default is "score.+te"
+    score: str
+        the score name to be optimized (default "mean_score_te").
 
     arg_max: boolean
         True/False take parameters that maximize/minimize the score. Default
@@ -153,14 +166,13 @@ class CVGridSearchRefit(Estimator):
     """
 
     def __init__(self, *tasks, **kwargs):
-        super(CVGridSearchRefit, self).__init__(estimator=None)
-        key3 = kwargs.pop("key3") if "key3" in kwargs \
-            else Result.SCORE + ".+" + Result.TEST
+        super(CVBestSearchRefit, self).__init__(estimator=None)
+        score = kwargs.pop("score") if "score" in kwargs else "mean_score_te"
         arg_max = kwargs.pop("arg_max") if "arg_max" in kwargs else True
         from epac.workflow.splitters import CV, Grid
         grid = Grid(*tasks)
-        cv = CV(node=grid, reducer=None, **kwargs)
-        self.key3 = key3
+        cv = CV(node=grid, reducer=SummaryStat(keep=False), **kwargs)
+        self.score = score
         self.arg_max = arg_max
         self.add_child(cv)  # first child is the CV
 
@@ -177,16 +189,22 @@ class CVGridSearchRefit(Estimator):
 
     def fit(self, recursion=True, **Xy):
         # Fit/predict CV grid search
-        cv_grid_search = self.children[0]
-        cv_grid_search.store = StoreMem()  # local store erased at each fit
+        cv = self.children[0]
+        cv.store = StoreMem()  # local store erased at each fit
         from epac.workflow.splitters import CV
-        if not isinstance(cv_grid_search, CV):
+        if not isinstance(cv, CV):
             raise ValueError('Child of %s is not a "CV."'
             % self.__class__.__name__)
-        cv_grid_search.fit_predict(recursion=True, **Xy)
+        cv.fit_predict(recursion=True, **Xy)
         #  Pump-up results
         methods = list()
-        cv_grid_search.bottum_up(store_results=True)
+        cv_result_set = cv.reduce(store_results=True)
+        key_val = [(result.key(), result[self.score]) for result in cv_result_set]
+        mean_cv = np.asarray(zip(*key_val)[1])
+        mean_cv_opt = np.max(mean_cv) if self.arg_max else  np.min(mean_cv)
+        idx_best = np.where(mean_cv == mean_cv_opt)[0][0]
+        best_signature = key_val[idx_best][0]
+        
         if debug.DEBUG:
             debug.current = self
             debug.Xy = Xy

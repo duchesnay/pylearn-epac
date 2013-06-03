@@ -12,9 +12,9 @@ X, y = datasets.make_classification(n_samples=12, n_features=10,
                                     n_informative=2)
 from epac import debug
 Xy = dict(X=X, y=y)
-from epac import CVGridSearchRefit
+from epac import CVBestSearchRefit
 # CV + Grid search of a simple classifier
-self = CVGridSearchRefit(*[SVC(C=C, kernel=ker) for C in [1, 10] for ker in ["rbf", "linear"]], n_folds=2)
+self = CVBestSearchRefit(*[SVC(C=C, kernel=ker) for C in [1, 10] for ker in ["rbf", "linear"]], n_folds=2)
 self.fit(X=X, y=y)
 import re
 import numpy as np
