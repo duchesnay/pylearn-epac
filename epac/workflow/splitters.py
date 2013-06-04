@@ -47,13 +47,13 @@ class BaseNodeSplitter(BaseNode):
         # 1) Build sub-aggregates over children
         children_results = [child.reduce(store_results=False) for
             child in self.children]
-        results = ResultSet(children_results)
+        result_set = ResultSet(children_results)
         if not self.reducer:
-            return results
+            return result_set
         # Group by key, without consideration of the fold/permutation number
         # which is the head of the key
         groups = dict()
-        for result in results:
+        for result in result_set:
             # remove the head of the key
             _, key_tail = key_pop(result["key"], index=0)
             result["key"] = key_tail
@@ -266,16 +266,16 @@ class Methods(BaseNodeSplitter):
         return results
 
 
-class Grid(Methods):
-    """Similar to Methods except the way that the upstream data-flow is
-    processed.
-    """
-    def __init__(self, *nodes):
-        super(Grid, self).__init__(*nodes)
-        # Set signature2_args_str to"*" to create collision between secondary
-        # keys see RowSlicer.get_signature()
-        for c in self.children:
-            c.signature2_args_str = "*"
+#class Grid(Methods):
+#    """Similar to Methods except the way that the upstream data-flow is
+#    processed.
+#    """
+#    def __init__(self, *nodes):
+#        super(Grid, self).__init__(*nodes)
+#        # Set signature2_args_str to"*" to create collision between secondary
+#        # keys see RowSlicer.get_signature()
+#        for c in self.children:
+#            c.signature2_args_str = "*"
 
 
 # -------------------------------- #
@@ -321,13 +321,9 @@ class Slicer(BaseNode):
         return dict(slices=self.slices)
 
     def get_signature(self, nb=1):
-        """Overload the base name method.
-        - Use self.signature_name
-        - Cause intermediary keys collision which trig aggregation."""
-        if nb is 1:
-            return self.signature_name + "(nb=" + str(self.signature_args["nb"]) + ")"
-        else:
-            return self.signature_name + "(*)"
+        """Overload the base name method: use self.signature_name"""
+        return self.signature_name + \
+            "(nb=" + str(self.signature_args["nb"]) + ")"
 
     def get_signature_args(self):
         """overried get_signature_args to return a copy"""

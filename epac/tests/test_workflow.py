@@ -8,13 +8,13 @@ Test complex workflows made of combination of several primitives.
 """
 import unittest
 
-import string
-import os.path
+#import string
+#import os.path
 import numpy as np
 from sklearn import datasets
 from sklearn.svm import SVC
 from sklearn.feature_selection import SelectKBest
-from epac import CVBestSearchRefit, Grid, Pipe, CV, Perms
+from epac import CVBestSearchRefit, Pipe, CV, Perms, Methods
 from epac import SummaryStat, PvalPerms
 from epac.sklearn_plugins import Permutations
 
@@ -58,9 +58,10 @@ class TestPermCV(unittest.TestCase):
             self.assertTrue(comp, u'Diff Perm / CV: EPAC vs sklearn')
 
             # test reduce
-            r_epac_reduce = wf.reduce().values()[0]['pred_te']
+            r_epac_reduce = [v['pred_te'] for v in wf.reduce().values()]
             comp = np.all(np.asarray(r_epac_reduce) == np.asarray(r_sklearn))
             self.assertTrue(comp, u'Diff Perm / CV: EPAC reduce')
+
 
 class TestCVBestSearchRefit(unittest.TestCase):
 
@@ -73,50 +74,35 @@ class TestCVBestSearchRefit(unittest.TestCase):
         random_state = 0
         k_values = [2, 3]
         C_values = [1, 10]
-        # ===================
+
         # = With EPAC
-        # ===================
-        ## CV + Grid search of a pipeline with a nested grid search
-        pipeline = CVBestSearchRefit(*[
-                      Pipe(SelectKBest(k=k),
-                          Grid(*[SVC(kernel="linear", C=C) for C in C_values]))
-                      for k in k_values],
-                      n_folds=n_folds_nested, random_state=random_state)
-        wf = Perms(
-                 CV(pipeline,
-                       n_folds=n_folds,
-                       reducer=SummaryStat(keep=True)),
+        pipelines = Methods(*[Pipe(SelectKBest(k=k), Methods(*[SVC(C=C) for C in C_values])) for k in k_values])
+        #print [n for n in pipelines.walk_leaves()]
+        pipelines_cv = CVBestSearchRefit(pipelines,
+                        sn_folds=n_folds_nested, random_state=random_state)
+        wf = Perms(CV(pipelines_cv,n_folds=n_folds, reducer=SummaryStat(keep=True)),
                  n_perms=n_perms, permute="y",
                  reducer=PvalPerms(keep=True),
                  random_state=random_state)
-
         wf.fit_predict(X=X, y=y)
-        R1 = wf.reduce()
-        rm = os.path.dirname(os.path.dirname(R1.keys()[0])) + "/"
-        R1 = {string.replace(key, rm, ""): R1[key] for key in R1}
-        keys = R1.keys()
+        r_epac = wf.reduce().values()[0]
 
-        # ===================
-        # = Without EPAC
-        # ===================
+        # = With SKLEARN
         from sklearn.cross_validation import StratifiedKFold
         from epac.sklearn_plugins import Permutations
         from sklearn.pipeline import Pipeline
         from sklearn import grid_search
 
-        clfs = {keys[0]: \
-            Pipeline([('anova', SelectKBest(k=3)), ('svm', SVC(kernel="linear"))])}
+        clf = Pipeline([('anova', SelectKBest(k=3)), ('svm', SVC(kernel="linear"))])
         parameters = {'anova__k': k_values, 'svm__C': C_values}
 
-        R2 = dict()
-        for key in keys:
-            R2[key] = dict()
-            R2[key]['pred_te'] = [[None] * n_folds for i in xrange(n_perms)]
-            R2[key]['true_te'] = [[None] * n_folds for i in xrange(n_perms)]
-            R2[key]['score_tr'] = [[None] * n_folds for i in xrange(n_perms)]
-            R2[key]['score_te'] = [[None] * n_folds for i in xrange(n_perms)]
-            R2[key]['mean_score_te'] = [None] * n_perms
-            R2[key]['mean_score_tr'] = [None] * n_perms
+        r_sklearn = dict()
+        r_sklearn['pred_te'] = [[None] * n_folds for i in xrange(n_perms)]
+        r_sklearn['true_te'] = [[None] * n_folds for i in xrange(n_perms)]
+        r_sklearn['score_tr'] = [[None] * n_folds for i in xrange(n_perms)]
+        r_sklearn['score_te'] = [[None] * n_folds for i in xrange(n_perms)]
+        r_sklearn['mean_score_te'] = [None] * n_perms
+        r_sklearn['mean_score_tr'] = [None] * n_perms
 
         perm_nb = 0
         perms = Permutations(n=y.shape[0], n_perms=n_perms, random_state=random_state)
@@ -131,42 +117,32 @@ class TestCVBestSearchRefit(unittest.TestCase):
                 X_test = X[idx_test, :]
                 y_p_train = y_p[idx_train, :]
                 y_p_test = y_p[idx_test, :]
-                for key in keys:
-                    clf = clfs[key]
-                    # Nested CV
-                    cv_nested = StratifiedKFold(y=y_p_train, n_folds=n_folds_nested)
-                    gscv = grid_search.GridSearchCV(clf, parameters, cv=cv_nested)
-                    gscv.fit(X_train, y_p_train)
-                    R2[key]['pred_te'][perm_nb][fold_nb] = gscv.predict(X_test)
-                    R2[key]['true_te'][perm_nb][fold_nb] = y_p_test
-                    R2[key]['score_tr'][perm_nb][fold_nb] =\
-                        gscv.score(X_train, y_p_train)
-                    R2[key]['score_te'][perm_nb][fold_nb] =\
-                        gscv.score(X_test, y_p_test)
-                    fold_nb += 1
-            for key in keys:
-                # Average over folds
-                R2[key]['mean_score_te'][perm_nb] = \
-                    np.mean(np.asarray(R2[key]['score_te'][perm_nb]), axis=0)
-                R2[key]['mean_score_tr'][perm_nb] = \
-                    np.mean(np.asarray(R2[key]['score_tr'][perm_nb]), axis=0)
+                # Nested CV
+                cv_nested = StratifiedKFold(y=y_p_train, n_folds=n_folds_nested)
+                gscv = grid_search.GridSearchCV(clf, parameters, cv=cv_nested)
+                gscv.fit(X_train, y_p_train)
+                r_sklearn['pred_te'][perm_nb][fold_nb] = gscv.predict(X_test)
+                r_sklearn['true_te'][perm_nb][fold_nb] = y_p_test
+                r_sklearn['score_tr'][perm_nb][fold_nb] =\
+                    gscv.score(X_train, y_p_train)
+                r_sklearn['score_te'][perm_nb][fold_nb] =\
+                    gscv.score(X_test, y_p_test)
+                fold_nb += 1
+            # Average over folds
+            r_sklearn['mean_score_te'][perm_nb] = \
+                np.mean(np.asarray(r_sklearn['score_te'][perm_nb]), axis=0)
+            r_sklearn['mean_score_tr'][perm_nb] = \
+                np.mean(np.asarray(r_sklearn['score_tr'][perm_nb]), axis=0)
                     #np.mean(R2[key]['score_tr'][perm_nb])
             perm_nb += 1
 
-        # ===================
         # = Comparison
-        # ===================
-        comp = dict()
-        for key in R1:
-            r1 = R1[key]
-            r2 = R2[key]
-            comp[key] = {k: np.all(np.asarray(r1[k]) == np.asarray(r2[k])) \
-                for k in set(r1.keys()).intersection(set(r2.keys()))}
+        shared_keys = set(r_epac.keys()).intersection(set(r_sklearn.keys()))
+        comp = {k: np.all(np.asarray(r_epac[k]) == np.asarray(r_sklearn[k]))
+                for k in shared_keys}
         #return comp
         for key in comp:
-            for subkey in comp[key]:
-                self.assertTrue(comp[key][subkey],
-                u'Diff for key: "%s" and attribute: "%s"' % (key, subkey))
+            self.assertTrue(comp[key], u'Diff for attribute: "%s"' % key)
 
 
 

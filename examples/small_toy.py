@@ -13,19 +13,6 @@ from sklearn.feature_selection import SelectKBest
 X, y = datasets.make_classification(n_samples=12, n_features=10,
                                     n_informative=2)
 
-# Model selection using CV: CV + Grid
-# -----------------------------------------
-from epac import Grid, Pipe, CVBestSearchRefit, StoreMem, Methods
-anovas_svm = Methods(*[Pipe(SelectKBest(k=k), SVC(C=C)) for k in [1, 2] for C in [1, 10]])
-self = CVBestSearchRefit(anovas_svm)
-
-Xy=dict(X=X, y=y)
-# CV + Grid search of a simple classifier
-self = CVBestSearchRefit(*[SVC(C=C) for C in [1, 10]])
-self.fit(X=X, y=y)
-self.fit_predict(X=X, y=y)
-wf.reduce()
-
 
 # Build sequential Pipeline
 # -------------------------
@@ -81,26 +68,6 @@ anovas_svm.fit_predict(X=X, y=y)
 print anovas_svm.reduce()
 
 
-## Parallelize SVM with several parameters.
-## Collisions between upstream keys, trig aggretation.
-##                   Grid                Grid (Splitter)
-##                  /     \
-## SVM(linear, C=1)  .... SVM(rbf, C=10) Classifiers (Estimator)
-## Grid and PArMethods differ onlys the way they process the upstream
-## flow. With Grid Children differs only by theire arguments, and thus
-## are aggregated toggether
-#from epac import Grid
-#svms = Grid(SVC(C=1), SVC(C=10))
-#svms.fit_predict(X=X, y=y)
-#svms.reduce()
-#
-## Two parameters
-#svms = Grid(*[SVC(kernel=kernel, C=C) for kernel in ("linear", "rbf")
-#    for C in [1, 10]])
-#svms.fit_predict(X=X, y=y)
-#svms.reduce()
-
-
 # Cross-validation
 # ----------------
 # CV of LDA
@@ -117,18 +84,30 @@ cv.fit_predict(X=X, y=y)
 print cv.reduce()
 
 
-# Model selection using CV: CV + Grid
-# -----------------------------------------
-from epac import Grid, Pipe, CVBestSearchRefit
+# Model selection using CV
+# ------------------------
+# CVBestSearchRefit
+#      Methods       (Splitter)
+#      /    \
+# SVM(C=1)  SVM(C=10)   Classifier (Estimator)
+from epac import Pipe, CVBestSearchRefit, Methods
 # CV + Grid search of a simple classifier
-wf = CVBestSearchRefit(*[SVC(C=C) for C in [1, 10]])
+wf = CVBestSearchRefit(Methods(*[SVC(C=C) for C in [1, 10]]))
 wf.fit_predict(X=X, y=y)
 wf.reduce()
 
-# CV + Grid search of a pipeline with a nested grid search
-methods = [Pipe(SelectKBest(k=k), Grid(*[SVC(C=C) for C in [1, 10]]))
-                for k in [1, 5]]
-wf = CVBestSearchRefit(*methods)
+# Feature selection combined with SVM and LDA
+# CVBestSearchRefit
+#                     Methods          (Splitter)
+#               /              \
+#            KBest(1)         KBest(5) SelectKBest (Estimator)
+#              |
+#            Methods                   (Splitter)
+#        /     |     \
+#    LDA() SVM(C=1)  SVM(C=10) ...     Classifiers (Estimator)
+pipelines = Methods(*[Pipe(SelectKBest(k=k), Methods(*[LDA()]+[SVC(C=C) for C in [1, 10]])) for k in [1, 5]])
+print [n for n in pipelines.walk_leaves()]
+wf = CVBestSearchRefit(pipelines)
 wf.fit_predict(X=X, y=y)
 wf.reduce()
 

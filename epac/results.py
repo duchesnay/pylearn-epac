@@ -10,12 +10,14 @@ import warnings
 
 
 class ResultSet(Set):
-    """ResultSet is a dictionnary indexed by intermediry keys (key2). It contains
-    Result.
+    """ResultSet is a set of Result
 
-    See also
-    --------
-    Result
+    Example
+    -------
+    >>> from epac import Result, ResultSet
+    >>> result_set = ResultSet()
+    >>> result_set.add(Result('SVC(C=1)',  payload=dict(score=.33)))
+    >>> result_set.add(Result('SVC(C=10)', payload=dict(score=.55)))
     """
 
     def __init__(self, results_list=None):
@@ -49,13 +51,13 @@ class ResultSet(Set):
     def __repr__(self):
         ret = ""
         for res in self.results:
-            ret += res.key() + ":"
-            ret += repr({k: res[k] for k in res if k != "key"}) + "\n"
+            ret += repr(res) + "\n"
         return ret
 
     def add(self, result):
         if result in self:
-            msg = 'Key "%s" already in ResultSet, do not overwrite' % result.key()
+            msg = 'Key "%s" already in ResultSet, do not overwrite' % \
+                result.key()
             warnings.warn(msg)
             ## FIX ME
             print msg
@@ -65,41 +67,19 @@ class ResultSet(Set):
     def values(self):
         return self.results
 
-#    def add(self, key2, suffix, score=None, pred=None, true=None):
-#        """
-#        Parameters
-#        ----------
-#        key2 str
-#            Secondary key
-#
-#        suffix str
-#            Result.TRAIN or Result.TEST
-#
-#        score Any type
-#            the score
-#
-#        """
-#        if key2 in self:
-#            res = self[key2]
-#        else:
-#            res = Result()
-#            self[key2] = res
-#        if score is not None:
-#            res[Result.concat_key3(Result.SCORE, suffix)] = score
-#        if pred is not None:
-#            res[Result.concat_key3(Result.PRED, suffix)] = pred
-#        if true is not None:
-#            res[Result.concat_key3(Result.TRUE, suffix)] = true
+    def keys(self):
+        return [r["key"] for r in self.results]
 
 
 class Result(dict):
-    """Result is a record with a key, and a payload.
+    """Result is a record with a "key", and a "payload".
 
     Example
     -------
-    r = Result(key='SVC(C=1)')
-    r[Result.SCORE, Result.TRAIN] = 1.0
-    Result
+    >>> from epac import Result
+    >>> r = Result('SVC(C=1)')
+    >>> r["foo"] = "bar"
+    >>> r[Result.SCORE, Result.TRAIN] = 1.0
     """
     TRAIN = "tr"
     TEST = "te"
@@ -116,7 +96,11 @@ class Result(dict):
     def key(self):
         return self["key"]
 
+    def payload(self):
+        return {k: self[k] for k in self if k != "key"}
+
     def __setitem__(self, *args):
+        """if """
         if isinstance(args[0], tuple):
             arg_name = Result.cat(*args[0])
         else:
@@ -133,7 +117,7 @@ class Result(dict):
     def stack(self, result_list):
         """Stack results list, test that all results have the same key.
 
-        Example
+         Example
         -------
         >>> from epac import Result
         >>> r1 = Result('SVC(C=1)', {'score_te': .5, 'score_tr': 1,})
@@ -152,25 +136,3 @@ class Result(dict):
                 payload[k].append(result[k])
         payload.pop("key")
         return Result(key=key, payload=payload)
-
-"""
-run ../epac/results.py
-r1 = Result('SVC(C=1)')
-r1[Result.SCORE, Result.TRAIN] = 1.0
-r2 = Result('SVC(C=10)')
-r2[Result.SCORE, Result.TRAIN] = 1.0
-
-
-results = ResultSet()
-results.add(r1)
-results.add(r2)
-r1 = results['SVC(C=1)']
-r1[Result.SCORE, Result.TEST] = 0.8
-r2 = results['SVC(C=10)']
-r2[Result.SCORE, Result.TEST] = 0.8
-r2["toto"] = 0.8
-
-
-result_list = [r1, r2]
-
-"""

@@ -43,42 +43,6 @@ def _list_indices(l, val):
 
 class ListWithMetaInfo(list):
     pass
-    
-def _list_of_dicts_2_dict_of_lists(list_of_dict, axis_name=None,
-                                   axis_values=[]):
-    """Convert a list of dicts to a dictionnary of lists.
-
-    Example
-    -------
-   >>> _list_of_dicts_2_dict_of_lists([dict(a=1, b=2), dict(a=10, b=20)])
-   {'a': [1, 10], 'b': [2, 20]}
-    """
-
-    dict_of_list = dict()
-    for d in list_of_dict:
-        #self.children[child_idx].signature_args
-        #sub_aggregate = sub_aggregates[0]
-        for key2 in d.keys():
-            #key2 = sub_aggregate.keys()[0]
-            result = d[key2]
-            # result is a dictionary
-            if isinstance(result, dict):
-                if not key2 in dict_of_list.keys():
-                    dict_of_list[key2] = dict()
-                for key3 in result.keys():
-                    if not key3 in dict_of_list[key2].keys():
-                        dict_of_list[key2][key3] = ListWithMetaInfo()
-                        dict_of_list[key2][key3].axis_name = axis_name
-                        dict_of_list[key2][key3].axis_values = axis_values
-                    dict_of_list[key2][key3].append(result[key3])
-            else:  # simply concatenate
-                if not key2 in dict_of_list.keys():
-                    dict_of_list[key2] = ListWithMetaInfo()
-                    dict_of_list[key2].axis_name = axis_name
-                    dict_of_list[key2].axis_values = axis_values
-                dict_of_list[key2].append(result)
-    return dict_of_list
-
 
 def dict_diff(*dicts):
     """Find the differences in a dictionaries

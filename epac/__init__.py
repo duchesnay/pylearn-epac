@@ -7,7 +7,7 @@ Created on Wed Jan 23 13:58:21 2013
 """
 
 from epac.workflow.pipeline import Pipe
-from epac.workflow.splitters import CV, Perms, Methods, Grid
+from epac.workflow.splitters import CV, Perms, Methods#, Grid
 from epac.workflow.estimators import CVBestSearchRefit
 from epac.workflow.base import xy_split, xy_merge, key_pop
 from epac.configuration import conf, debug
@@ -29,7 +29,7 @@ from . import sklearn_plugins
 __all__ = ['Pipe',
            'CV',
            'Perms',
-           'Grid',
+#           'Grid',
            'Methods',
            'CVBestSearchRefit',
            'SummaryStat',

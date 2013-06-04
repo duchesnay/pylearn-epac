@@ -11,10 +11,7 @@ import sys
 import numpy as np
 from abc import abstractmethod
 import ast
-from epac.utils import _list_union_inter_diff, _list_indices
-from epac.utils import _list_of_dicts_2_dict_of_lists
 from epac.stores import StoreMem
-from epac.results import ResultSet
 from epac.configuration import conf, debug
 
 
@@ -211,6 +208,17 @@ class BaseNode(object):
                 for yielded in child.walk_nodes():
                     yield yielded
 
+    def walk_true_nodes(self):
+        yield self
+        if self.children:
+            if isinstance(self.children, list):
+                children = self.children
+            else:
+                children = [self.children[0]]
+            for child in children:
+                for yielded in child.walk_true_nodes():
+                    yield yielded
+
     def walk_leaves(self):
         """Leaves iterator"""
         if not self.children:
@@ -298,11 +306,6 @@ class BaseNode(object):
             raise ValueError("Provide at least a key for exact match"
             "or a regexp for wild card matches")
 
-#    def get_path_from_root(self):
-#        if self.parent is None:
-#            return [self]
-#        return self.parent.get_path_from_root() + [self]
-
     def get_path_from_root(self):
         """Get path iterator from root.
 
@@ -355,39 +358,25 @@ class BaseNode(object):
             curr = child
             yield curr
 
-#    def get_path_from_node(self, node):
-#        if self is node:
-#            return [self]
-#        return self.parent.get_path_from_node(node) + [self]
-
     # --------------------- #
     # -- Key             -- #
     # --------------------- #
 
-    def get_key(self, nb=1):
-        """Return primary or intermediate key.
+    def get_key(self):
+        """Return primary  key.
 
         Primary key is a unique identifier of a node in the tree, it is
         used to store leaf outputs at the end of the downstream flow.
-        Intermediate key identify upstream results. Collisions between
-        intermediate trig an aggregation of all results having the same key.
-
-        Argument
-        --------
-        nb: int
-            1 (default) return the primary key (ds data-flow).
-            2 return the intermediate key (us data-flow).
+        Intermediate key identify upstream results.
         """
         if not self.parent:
-            return self.get_signature(nb=nb)
-            #return key_push(self.store, self.get_signature(nb=nb))
+            return self.get_signature()
         elif not hasattr(self.parent, "get_key"):
-            return key_push(str(self.parent), self.get_signature(nb=nb))
+            return key_push(str(self.parent), self.get_signature())
         else:
-            return key_push(self.parent.get_key(nb=nb),
-                            self.get_signature(nb=nb))
+            return key_push(self.parent.get_key(), self.get_signature())
 
-    def get_signature(self, nb=1):
+    def get_signature(self):
         """The signature of the current Node, used to build the key.
 
         By default primary and intermediate signatures are identical.
@@ -525,89 +514,9 @@ class BaseNode(object):
     # --------------------------------------------- #
     # -- Bottum-up data-flow operations (reduce) -- #
     # --------------------------------------------- #
-
-    def bottum_up2(self, store_results=True):
-        # Terminaison (leaf) node return results
-        if not self.get_children_bottum_up():
-            return self.load_state(name="results")
-        # 1) Build sub-aggregates over children
-        children_results = [child.bottum_up(store_results=False) for
-            child in self.get_children_bottum_up()]
-        results = ResultSet(children_results)
-        for result in results:
-            result["key"] = key_push(self.get_signature(), result["key"])
-        #
-        if debug.DEBUG:
-            debug.current = self
-        if len(children_results) == 1:
-            if store_results:
-                self.save_state(state=children_results[0], name="results")
-            return children_results[0]
-        # 2) Test collision between intermediary keys
-        keys_all = list()
-        keys_set = set()
-        for r in children_results:
-            keys_all += r.keys()
-            keys_set.update(r.keys())
-        # 3) No collision: merge results in a lager dict an return
-        if len(keys_set) == len(keys_all):
-            merge = ResultSet()
-            [merge.update(item) for item in children_results]
-            if store_results:
-                self.save_state(state=merge, name="results")
-            return merge
-        # 4) Collision occurs
-        # Aggregate (stack) all children results with identical
-        # intermediary key, by stacking them according to
-        # argumnents. Ex.: stack for a CV stack folds, for a Grid
-        children_args = [child.get_signature_args() for child in self.children]
-        _, arg_names, diff_arg_names = _list_union_inter_diff(*[d.keys()
-                                                for d in children_args])
-        if diff_arg_names:
-            raise ValueError("Children have different arguments name")
-        sub_arg_names, sub_arg_values, results =\
-            self._stack_results_over_argvalues(arg_names, children_results,
-                                          children_args)
-        # Reduce results if there is a reducer
-        if self.reducer:
-            results = {key2: self.reducer.reduce(result=results[key2]) for
-                key2 in results}
-        if store_results:
-            self.save_state(state=results, name="results")
-        return results
-
-    def _stack_results_over_argvalues(self, arg_names, children_results,
-                                      children_args):
-        if not arg_names:
-            # Should correspond to a single results
-            if len(children_results) != 1:
-                raise ValueError("Many results were only one expected")
-            return [], [], children_results[0]
-        arg_name = arg_names[0]
-        stack_arg = list()
-        children_arg = [child_arg[arg_name] for child_arg in children_args]
-        arg_values = list(set(sorted(children_arg)))
-        for val in arg_values:
-            children_select = _list_indices(children_arg, val)
-            children_results_select = [children_results[i] for i
-                                            in children_select]
-            children_args_select = [children_args[i] for i in children_select]
-            sub_arg_names, sub_arg_values, sub_stacked = \
-                self._stack_results_over_argvalues(
-                              arg_names=arg_names[1:],
-                              children_results=children_results_select,
-                              children_args=children_args_select)
-            stack_arg.append(sub_stacked)
-        stacked = _list_of_dicts_2_dict_of_lists(stack_arg,
-                                                 axis_name=arg_name,
-                                                 axis_values=arg_values)
-        return arg_names, arg_values, stacked
-
-    #reduce = bottum_up
-
-    def get_children_bottum_up(self):
-        """Return children during the bottum-up execution."""
-        return self.children
+    @abstractmethod
+    def reduce(self, store_results=True):
+        """ Reduce abstract method"""
 
     # -------------------------------- #
     # -- I/O persistance operations -- #
@@ -634,7 +543,7 @@ class BaseNode(object):
         """
         # Save execution tree without the stores
         stores = dict()
-        for node in self._walk_true_nodes():
+        for node in self.walk_true_nodes():
             if node.store:
                 stores[node.get_key()] = node.store
                 node.store = None
@@ -653,14 +562,3 @@ class BaseNode(object):
         """I/O (persistance) operation: save single node states ie.: store"""
         store.save(key=key_push(self.get_key(), conf.STORE_STORE_PREFIX),
                        obj=self.store, protocol="bin")
-
-    def _walk_true_nodes(self):
-        yield self
-        if self.children:
-            if isinstance(self.children, list):
-                children = self.children
-            else:
-                children = [self.children[0]]
-            for child in children:
-                for yielded in child.walk_nodes():
-                    yield yielded
