@@ -101,23 +101,23 @@ class CV(BaseNodeSplitter):
         self.random_state = random_state
         self.cv_type = cv_type
         self.reducer = reducer
-        slicer = RowSlicer(signature_name="CV", nb=0, apply_on=None)
-        self.children = SlicerVirtualList(size=n_folds, parent=self, slicer=slicer)
-        self.add_child(slicer)
+        self.slicer = RowSlicer(signature_name="CV", nb=0, apply_on=None)
+        self.children = VirtualList(size=n_folds, callback=self.move_to_child)
+        self.slicer.parent = self
         subtree = node if isinstance(node, BaseNode) else Estimator(node)
-        slicer.add_child(subtree)
+        self.slicer.add_child(subtree)
 
-    def move_to_child(self, nb, slicer):
-        slicer.set_nb(nb)
+    def move_to_child(self, nb):
+        self.slicer.set_nb(nb)
         if hasattr(self, "_sclices"):
             cpt = 0
             for train, test in self._sclices:
                 if cpt == nb:
                     break
                 cpt += 1
-            slicer.set_sclices({CV.SUFFIX_TRAIN: train,
+            self.slicer.set_sclices({CV.SUFFIX_TRAIN: train,
                                              CV.SUFFIX_TEST: test})
-        return slicer
+        return self.slicer
 
     def fit(self, recursion=True, **Xy):
         """Call transform with sample_set="train" """
@@ -183,22 +183,22 @@ class Perms(BaseNodeSplitter):
         self.permute = permute  # the name of the bloc to be permuted
         self.random_state = random_state
         self.reducer = reducer
-        slicer = RowSlicer(signature_name="Perm", nb=0, apply_on=permute)
-        self.children = SlicerVirtualList(size=n_perms, parent=self, slicer=slicer)
-        self.add_child(slicer)
+        self.slicer = RowSlicer(signature_name="Perm", nb=0, apply_on=permute)
+        self.children = VirtualList(size=n_perms, callback=self.move_to_child)
+        self.slicer.parent = self
         subtree = node if isinstance(node, BaseNode) else Estimator(node)
-        slicer.add_child(subtree)
+        self.slicer.add_child(subtree)
 
-    def move_to_child(self, nb, slicer):
-        slicer.set_nb(nb)
+    def move_to_child(self, nb):
+        self.slicer.set_nb(nb)
         if hasattr(self, "_sclices"):
             cpt = 0
             for perm in self._sclices:
                 if cpt == nb:
                     break
                 cpt += 1
-            slicer.set_sclices(perm)
-        return slicer
+            self.slicer.set_sclices(perm)
+        return self.slicer
 
     def get_parameters(self):
         return dict(n_perms=self.n_perms, permute=self.permute)
@@ -265,45 +265,27 @@ class Methods(BaseNodeSplitter):
         results = ResultSet(children_results)
         return results
 
-
-#class Grid(Methods):
-#    """Similar to Methods except the way that the upstream data-flow is
-#    processed.
-#    """
-#    def __init__(self, *nodes):
-#        super(Grid, self).__init__(*nodes)
-#        # Set signature2_args_str to"*" to create collision between secondary
-#        # keys see RowSlicer.get_signature()
-#        for c in self.children:
-#            c.signature2_args_str = "*"
-
-
 # -------------------------------- #
 # -- Slicers                    -- #
 # -------------------------------- #
 
-class SlicerVirtualList(collections.Sequence):
-    def __init__(self, size, parent, slicer):
+class VirtualList(collections.Sequence):
+    def __init__(self, size, callback):
         self.size = size
-        self.parent = parent
-        self.sclicer = slicer
-
+        self.callback = callback
     def __len__(self):
         return self.size
-
     def __getitem__(self, i):
         if i >= self.size:
             raise IndexError("%s index out of range" % self.__class__.__name__)
-        return self.parent.move_to_child(i, self.slicer)
-
+        return self.callback(i)
+        #return self.parent.move_to_child(i, self.slicer)
     def __iter__(self):
         """ Iterate over leaves"""
         for i in xrange(self.size):
             yield self.__getitem__(i)
-
-    def append(self, slicer):
-        """ Iterate over leaves"""
-        self.slicer = slicer
+    def append(self, o):
+        pass
 
 
 class Slicer(BaseNode):

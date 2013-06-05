@@ -14,10 +14,11 @@ from sklearn.svm import SVC
 from sklearn.lda import LDA
 from sklearn.feature_selection import SelectKBest
 import sklearn.pipeline
-from epac import Pipe, Methods, CV, Perms
+from sklearn.cross_validation import StratifiedKFold
+from sklearn import grid_search
+from epac import Pipe, Methods, CV, Perms, CVBestSearchRefit
 from epac import SummaryStat
 from epac.sklearn_plugins import Permutations
-
 
 class TestPipeline(unittest.TestCase):
 
@@ -56,7 +57,6 @@ class TestCV(unittest.TestCase):
         r_epac = wf.fit_predict(X=X, y=y)
 
         # = With SKLEARN
-        from sklearn.cross_validation import StratifiedKFold
         clf = SVC(kernel="linear")
         r_sklearn = list()
         for idx_train, idx_test in StratifiedKFold(y=y, n_folds=n_folds):
@@ -109,16 +109,32 @@ class TestPerms(unittest.TestCase):
         self.assertTrue(comp, u'Diff Perm: EPAC reduce')
 
 
-#class TestCVBestSearchRefit(unittest.TestCase):
-#
-#    def test2_cvgridsearchrefit(self):
-#        X, y = datasets.make_classification(n_samples=12, n_features=10, n_informative=2)
-#        from epac import CVBestSearchRefit
-#        # CV + Grid search of a simple classifier
-#        wf = CVBestSearchRefit(*[SVC(C=C) for C in [1, 10]], n_folds=2)
-#        wf.fit_predict(X=X, y=y)
-#        wf.reduce()
+class TestCVBestSearchRefit(unittest.TestCase):
 
+    def test2_cvgridsearchrefit(self):
+        X, y = datasets.make_classification(n_samples=12, n_features=10, n_informative=2)
+        n_folds_nested = 2
+        #random_state = 0
+        C_values = [.1, 1, 5]
+
+        # With EPAC
+        methods = Methods(*[SVC(C=C, kernel="linear") for C in C_values])
+        wf = CVBestSearchRefit(methods, n_folds=n_folds_nested)
+        wf.fit_predict(X=X, y=y)
+        r_epac = wf.reduce().values()[0]
+
+        # - Without EPAC
+        r_sklearn = dict()
+        clf = SVC(kernel="linear")
+        parameters = {'C': C_values}
+        cv_nested = StratifiedKFold(y=y, n_folds=n_folds_nested)
+        gscv = grid_search.GridSearchCV(clf, parameters, cv=cv_nested)
+        gscv.fit(X, y)
+        r_sklearn['pred_te'] = gscv.predict(X)
+        r_sklearn['best_params'] = gscv.best_params_
+        print r_sklearn
+        print r_epac
+    
 class TestMethods(unittest.TestCase):
 
     def test_constructor_avoid_collision_level1(self):

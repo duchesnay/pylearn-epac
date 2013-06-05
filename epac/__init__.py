@@ -9,7 +9,7 @@ Created on Wed Jan 23 13:58:21 2013
 from epac.workflow.pipeline import Pipe
 from epac.workflow.splitters import CV, Perms, Methods#, Grid
 from epac.workflow.estimators import CVBestSearchRefit
-from epac.workflow.base import xy_split, xy_merge, key_pop
+from epac.workflow.base import xy_split, xy_merge, key_pop, key_split
 from epac.configuration import conf, debug
 from epac.results import ResultSet, Result
 from epac.utils import dict_diff, range_log2
@@ -29,7 +29,6 @@ from . import sklearn_plugins
 __all__ = ['Pipe',
            'CV',
            'Perms',
-#           'Grid',
            'Methods',
            'CVBestSearchRefit',
            'SummaryStat',
@@ -40,8 +39,9 @@ __all__ = ['Pipe',
            'conf',
            'debug',
            'xy_split',
-           'key_pop',
            'xy_merge',
+           'key_pop',
+           'key_split',
            'dict_diff',
            'StoreFs',
            'StoreMem',

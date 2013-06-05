@@ -4,22 +4,38 @@ Created on Thu May 23 15:21:35 2013
 
 @author: ed203246
 """
-
+import numpy as np
 from sklearn import datasets
 from sklearn.svm import SVC
+from sklearn.lda import LDA
 from sklearn.feature_selection import SelectKBest
-X, y = datasets.make_classification(n_samples=12, n_features=10,
-                                    n_informative=2)
-from epac import debug
-Xy = dict(X=X, y=y)
-from epac import CVBestSearchRefit
-# CV + Grid search of a simple classifier
-self = CVBestSearchRefit(*[SVC(C=C, kernel=ker) for C in [1, 10] for ker in ["rbf", "linear"]], n_folds=2)
-self.fit(X=X, y=y)
-import re
-import numpy as np
-key2 = cv_grid_search_results.keys()[0]
-result=cv_grid_search_results[key2]
-cv_node=cv_grid_search
-#self.fit_predict(X=X, y=y)
-#self.reduce()
+import sklearn.pipeline
+from sklearn.cross_validation import StratifiedKFold
+from sklearn import grid_search
+from epac import Pipe, Methods, CV, Perms, CVBestSearchRefit
+from epac import SummaryStat
+from epac.sklearn_plugins import Permutations
+
+X, y = datasets.make_classification(n_samples=12, n_features=10, n_informative=2)
+n_folds_nested = 2
+#random_state = 0
+C_values = [.1, 1, 2, 5, 10, 100]
+
+# With EPAC
+methods = Methods(*[SVC(C=C, kernel="linear") for C in C_values])
+wf = CVBestSearchRefit(methods, n_folds=n_folds_nested)
+self = wf
+wf.fit_predict(X=X, y=y)
+r_epac = wf.reduce().values()[0]
+
+# - Without EPAC
+r_sklearn = dict()
+clf = SVC(kernel="linear")
+parameters = {'C': C_values}
+cv_nested = StratifiedKFold(y=y, n_folds=n_folds_nested)
+gscv = grid_search.GridSearchCV(clf, parameters, cv=cv_nested)
+gscv.fit(X, y)
+r_sklearn['pred_te'] = gscv.predict(X)
+r_sklearn['best_params'] = gscv.best_params_
+print r_sklearn
+print r_epac

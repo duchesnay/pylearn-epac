@@ -13,7 +13,6 @@ from sklearn.feature_selection import SelectKBest
 X, y = datasets.make_classification(n_samples=12, n_features=10,
                                     n_informative=2)
 
-
 # Build sequential Pipeline
 # -------------------------
 # 2  SelectKBest (Estimator)

@@ -53,7 +53,7 @@ def key_pop(key, index=-1):
 _match_args_re = re.compile(u'([^(]+)\(([^)]+)\)')
 
 
-def key_split(key, eval_args=False):
+def key_split(key, eval=False):
     """ Split the key into signatures.
 
     Parameters
@@ -66,22 +66,35 @@ def key_split(key, eval_args=False):
       [(item_name1, [[argname, value], ...]), ...]
     Examples
     --------
-    >>> key_split(key='Methods/SelectKBest(k=1)/SVC(kernel=linear,C=1)')
-    ['Methods', 'SelectKBest(k=1)', 'SVC(kernel=linear,C=1)']
-    >>> key_split(key='Methods/SelectKBest(k=1)/SVC(kernel=linear,C=1)', eval_args=True)
-    [('Methods',), ('SelectKBest', [['k', 1]]), ('SVC', [['kernel', 'linear'], ['C', 1]])]
+    >>> key_split(key='SelectKBest(k=1)/SVC(kernel=linear,C=1)')
+    ['SelectKBest(k=1)', 'SVC(kernel=linear,C=1)']
+    >>> key_split(key='SelectKBest(k=1)/SVC(kernel=linear,C=1)', eval=True)
+    [[('name', 'SelectKBest'), ('k', 1)], [('name', 'SVC'), ('kernel', 'linear'), ('C', 1)]]
     """
     signatures = [signature for signature in key.split(conf.KEY_PATH_SEP)]
-    if eval_args:
+    if eval:
         return [signature_eval(signature) for signature in signatures]
     else:
         return signatures
 
 
 def signature_eval(signature):
+    """Evaluate the signature string, return a list of [(name, value)...]
+
+    Parameters
+    ----------
+    signature: str
+
+    Example
+    -------
+    >>> signature_eval('SVC(kernel=linear,C=1)')
+    [('name', 'SVC'), ('kernel', 'linear'), ('C', 1)]
+    """
     m = _match_args_re.findall(signature)
     if m:
         name = m[0][0]
+        ret = list()
+        ret.append(("name", name))
         argstr = m[0][1]
         args = [argstr.split("=") for argstr in argstr.split(",")]
         for arg in args:
@@ -89,9 +102,10 @@ def signature_eval(signature):
                 arg[1] = ast.literal_eval(arg[1])
             except ValueError:
                 pass
-        return(name, args)
+            ret.append((arg[0], arg[1]))
+        return ret
     else:
-        return(signature, )
+        return [("name", signature)]
 
 ## ============================================== ##
 ## == down-stream data-flow manipulation utils == ##

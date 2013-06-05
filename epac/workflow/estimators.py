@@ -47,7 +47,6 @@ class Estimator(BaseNode):
 
     def __init__(self, estimator):
         self.estimator = estimator
-        self.signature2_args_str = None
         super(Estimator, self).__init__()
         self._args_fit = _func_get_args_names(self.estimator.fit) \
             if hasattr(self.estimator, "fit") else None
@@ -170,6 +169,9 @@ class CVBestSearchRefit(Estimator):
         self.arg_max = arg_max
         self.add_child(cv)  # first child is the CV
 
+    def get_signature(self):
+        return self.__class__.__name__
+
     def get_children_top_down(self):
         """Return children during the top-down execution."""
         return []
@@ -186,8 +188,10 @@ class CVBestSearchRefit(Estimator):
         cv.fit_predict(recursion=True, **Xy)
         #  Pump-up results
         cv_result_set = cv.reduce(store_results=False)
+        print cv_result_set
         key_val = [(result.key(), result[self.score]) for result in cv_result_set]
         mean_cv = np.asarray(zip(*key_val)[1])
+        print mean_cv
         mean_cv_opt = np.max(mean_cv) if self.arg_max else  np.min(mean_cv)
         idx_best = np.where(mean_cv == mean_cv_opt)[0][0]
         best_key = key_val[idx_best][0]
@@ -203,7 +207,7 @@ class CVBestSearchRefit(Estimator):
         result_set = ResultSet([refited_result_set])
         result = result_set.values()[0]  # There is only one
         result["key"] = self.get_signature()
-        result["best"] = best_key
+        result["best_params"] = [dict(sig) for sig in key_split(best_key, eval=True)]
         self.save_state(result_set, name="result_set")
         #to_refit.bottum_up(store_results=False)
         # Delete (eventual) about previous refit
@@ -228,50 +232,3 @@ class CVBestSearchRefit(Estimator):
     def reduce(self, store_results=True):
         # Terminaison (leaf) node return result_set
         return self.load_state(name="result_set")
-
-#    def cv_grid_search(self, key2, result, cv_node):
-#        #print node, key2, result
-#        match_key3 = [key3 for key3 in result
-#            if re.search(self.key3, str(key3))]
-#        if len(match_key3) != 1:
-#            raise ValueError("None or more than one tertiary key found")
-#        # 1) Retrieve pairs of optimal (argument-name, value)
-#        key3 = match_key3[0]
-#        grid_cv = result[key3]
-#        mean_cv = np.mean(np.array(grid_cv), axis=0)
-#        mean_cv_opt = np.max(mean_cv) if self.arg_max else  np.min(mean_cv)
-#        idx_best = np.where(mean_cv == mean_cv_opt)
-#        idx_best = [idx[0] for idx in idx_best]
-#        grid = grid_cv[0]
-#        args_best = list()
-#        while len(idx_best):
-#            idx = idx_best[0]
-#            args_best.append((grid.axis_name, grid.axis_values[idx]))
-#            idx_best = idx_best[1:]
-#            grid = grid[0]
-#        # Retrieve one node that match intermediary key
-#        leaf = cv_node.get_node(regexp=key2, stop_first_match=True)
-#        # get path from current node
-#        path = leaf.get_path_from_node(cv_node)
-#        estimators = list()
-#        for node in path:
-#            if not hasattr(node, "estimator"):  # Strip off non estimator nodes
-#                continue
-#            estimator_args = copy.deepcopy(node.signature_args)
-#            for i in xrange(len(estimator_args)):
-#                arg_best = args_best[0]
-#                args_best = args_best[1:]
-#                #print node.get_key(), "Set", arg_best[0], "=", arg_best[1]
-#                estimator_args[arg_best[0]] = arg_best[1]
-#            new_estimator = copy.deepcopy(node.estimator)
-#            new_estimator.__dict__.update(estimator_args)
-#            #print "=>", new_estimator
-#            new_estimator_node = Estimator(new_estimator)
-#            new_estimator_node.signature_args = estimator_args
-#            # Parameters should no appear in intermediary key
-#            new_estimator_node.signature2_args_str = "*"
-#            estimators.append(new_estimator_node)
-#        # Build the sequential pipeline
-#        from epac.workflow.pipeline import Pipe
-#        pipeline = Pipe(*estimators)
-#        return pipeline
