@@ -115,7 +115,7 @@ class TestCVBestSearchRefit(unittest.TestCase):
         X, y = datasets.make_classification(n_samples=12, n_features=10, n_informative=2)
         n_folds_nested = 2
         #random_state = 0
-        C_values = [.1, 1, 5]
+        C_values = [.1, 0.5, 1, 2, 5]
 
         # With EPAC
         methods = Methods(*[SVC(C=C, kernel="linear") for C in C_values])

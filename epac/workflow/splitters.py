@@ -52,7 +52,9 @@ class BaseNodeSplitter(BaseNode):
             return result_set
         # Group by key, without consideration of the fold/permutation number
         # which is the head of the key
-        groups = dict()
+        # use OrderedDict to preserve runing order
+        from collections import OrderedDict
+        groups = OrderedDict()
         for result in result_set:
             # remove the head of the key
             _, key_tail = key_pop(result["key"], index=0)

@@ -188,10 +188,8 @@ class CVBestSearchRefit(Estimator):
         cv.fit_predict(recursion=True, **Xy)
         #  Pump-up results
         cv_result_set = cv.reduce(store_results=False)
-        print cv_result_set
         key_val = [(result.key(), result[self.score]) for result in cv_result_set]
         mean_cv = np.asarray(zip(*key_val)[1])
-        print mean_cv
         mean_cv_opt = np.max(mean_cv) if self.arg_max else  np.min(mean_cv)
         idx_best = np.where(mean_cv == mean_cv_opt)[0][0]
         best_key = key_val[idx_best][0]
