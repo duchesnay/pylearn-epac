@@ -47,7 +47,7 @@ class BaseNodeSplitter(BaseNode):
         # 1) Build sub-aggregates over children
         children_results = [child.reduce(store_results=False) for
             child in self.children]
-        result_set = ResultSet(children_results)
+        result_set = ResultSet(*children_results)
         if not self.reducer:
             return result_set
         # Group by key, without consideration of the fold/permutation number
@@ -262,7 +262,7 @@ class Methods(BaseNodeSplitter):
         # 1) Build sub-aggregates over children
         children_results = [child.reduce(store_results=False) for
             child in self.children]
-        results = ResultSet(children_results)
+        results = ResultSet(*children_results)
         return results
 
 # -------------------------------- #
@@ -312,7 +312,7 @@ class Slicer(BaseNode):
         return copy.copy(self.signature_args)
 
     def reduce(self, store_results=True):
-        results = ResultSet([self.children[0].reduce(store_results=False)])
+        results = ResultSet(self.children[0].reduce(store_results=False))
         for result in results:
             result["key"] = key_push(self.get_signature(), result["key"])
         return results

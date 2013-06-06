@@ -15,17 +15,23 @@ class ResultSet(Set):
     Example
     -------
     >>> from epac import Result, ResultSet
-    >>> result_set = ResultSet()
-    >>> result_set.add(Result('SVC(C=1)',  payload=dict(score=.33)))
-    >>> result_set.add(Result('SVC(C=10)', payload=dict(score=.55)))
+    >>> r1 = Result('SVC(C=1)', **dict(a=1, b=2))
+    >>> r2 = Result('SVC(C=2)', **dict(a=1, b=2))
+    >>> r3 = Result('SVC(C=3)', **dict(a=1, b=2))
+    >>> r4 = Result('SVC(C=4)', **dict(a=1, b=2))
+    >>> set1 = ResultSet(r1, r2)
+    >>> set2 = ResultSet(r3, r4)
+    >>> set3 = ResultSet(set1, set2)
+    >>> set3.add(Result('SVC(C=5)', **dict(a=1, b=2)))
     """
-
-    def __init__(self, results_list=None):
+    def __init__(self, *args):
         self.results = list()
-        if results_list:
-            for results in results_list:
-                for result in results:
-                    self.add(copy.copy(result))
+        for arg in args:
+            if isinstance(arg, ResultSet):
+                for res in arg:
+                    self.add(copy.copy(res))
+            if isinstance(arg, Result):
+                self.add(copy.copy(arg))
 
     def __contains__(self, result):
         for res in self.results:
@@ -84,9 +90,10 @@ class Result(dict):
     Example
     -------
     >>> from epac import Result
-    >>> r = Result('SVC(C=1)')
-    >>> r["foo"] = "bar"
-    >>> r[Result.SCORE, Result.TRAIN] = 1.0
+    >>> r1 = Result('SVC(C=1)', **dict(a=1, b=2))
+    >>> r2 = Result(**dict(key='SVC(C=10)', a=1, b=2))
+    >>> r1["foo"] = "bar"
+    >>> r1[Result.SCORE, Result.TRAIN] = 1.0
     """
     TRAIN = "tr"
     TEST = "te"
@@ -94,10 +101,10 @@ class Result(dict):
     PRED = "pred"
     TRUE = "true"
     SEP = "_"
-    PRINT_ORDER_REGEXP = ["key", ".*mean_score_te", ".*mean_score_tr", ".*score_te", ".*score_tr"]
+    PRINT_ORDER_REGEXP = ["key", ".*mean_score_te", ".*mean_score_tr",
+                          ".*score_te", ".*score_tr"]
 
     def __init__(self, key=None, **kwargs):
-        #self["key"] = key
         if key:
             super(Result, self).__setitem__("key", key)
         if dict:
@@ -119,16 +126,16 @@ class Result(dict):
         super(Result, self).__setitem__(arg_name, arg_val)
 
     def __repr__(self):
-        ordered_keys = _order_from_regexp(items=self.keys(), 
+        ordered_keys = _order_from_regexp(items=self.keys(),
                            order_regexps=Result.PRINT_ORDER_REGEXP)
         s = "{"
         cpt = 1
         for k in ordered_keys:
-            s +=  "'%s': %s" % (k, self[k])
+            s += "'%s': %s" % (k, self[k])
             if cpt < len(ordered_keys):
                 s += ", "
             cpt += 1
-        return s +"}"
+        return s + "}"
 
     @classmethod
     def cat(self, *parts):
@@ -178,7 +185,7 @@ def _order_from_regexp(items, order_regexps):
     return ordered
 
 """
-run /home/edouard/git/pylearn-epac/epac/results.py
+run /home/ed203246/git/pylearn-epac/epac/results.py
 
 self = Result(**{'true_te': np.array([0, 1, 0, 1, 0, 1]), 'score_tr': 1.0, 'score_te': 0.16666666666666666, 'pred_te': np.array([1, 0, 1, 1, 1, 0]), 'key': 'CV(nb=1)/SVC(C=0.1)', 'mean_score_te': 0.25})
 print self
@@ -191,10 +198,11 @@ ordered_keys = list()
 
 
 
-
+import numpy as np
 r1=Result(**{'true_te': np.array([0, 1, 0, 1, 0, 1]), 'score_tr': 1.0, 'score_te': 0.33333333333333331, 'mean_score_te': 0.33333333333333331, 'pred_te': np.array([1, 0, 1, 1, 0, 0]), 'key': 'CV(nb=1)/SVC(C=1)'})
 r2=Result(**{'true_te': np.array([0, 1, 0, 1, 0, 1]), 'score_tr': 1.0, 'score_te': 0.33333333333333331, 'pred_te': np.array([1, 0, 1, 1, 0, 0]), 'key': 'CV(nb=1)/SVC(C=2)'})
 r3=Result(**{'true_te': np.array([0, 1, 0, 1, 0, 1]), 'score_tr': 1.0, 'score_te': 0.33333333333333331, 'pred_te': np.array([1, 0, 1, 1, 0, 0]), 'key': 'CV(nb=1)/SVC(C=5)'})
+
 
 Result(**{'true_te': np.array([0, 1, 0, 1, 0, 1]), 'score_tr': 1.0, 'score_te': 0.33333333333333331, 'pred_te': np.array([1, 0, 1, 1, 0, 0]), 'key': 'CV(nb=1)/SVC(C=10)'})
 Result(**{'true_te': np.array([0, 1, 0, 1, 0, 1]), 'score_tr': 1.0, 'score_te': 0.33333333333333331, 'pred_te': np.array([1, 0, 1, 1, 0, 0]), 'key': 'CV(nb=1)/SVC(C=100)'})

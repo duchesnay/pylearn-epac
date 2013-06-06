@@ -38,6 +38,7 @@ from epac.stores import StoreMem
 from epac.configuration import debug
 from epac.reducers import SummaryStat
 
+
 ## ================================= ##
 ## == Wrapper node for estimators == ##
 ## ================================= ##
@@ -79,8 +80,7 @@ class Estimator(BaseNode):
             score = self.estimator.score(**Xy_dict)
             result = Result(key=self.get_signature())
             result[Result.SCORE, Result.TRAIN] = score
-            result_set = ResultSet()
-            result_set.add(result)
+            result_set = ResultSet(result)
             self.save_state(result_set, name="result_set")
         if self.children:  # transform downstream data-flow (ds) for children
             return self.transform(recursion=False, **Xy)
@@ -132,7 +132,7 @@ class Estimator(BaseNode):
         # 1) Build sub-aggregates over children
         children_result_set = [child.reduce(store_results=False) for
             child in self.children]
-        result_set = ResultSet(children_result_set)
+        result_set = ResultSet(*children_result_set)
         # Append node signature in the keys
         for result in result_set:
             result["key"] = key_push(self.get_signature(), result["key"])
@@ -204,7 +204,7 @@ class CVBestSearchRefit(Estimator):
         self.add_child(refited)
         refited.fit(recursion=True, **Xy)
         refited_result_set = refited.reduce(store_results=False)
-        result_set = ResultSet([refited_result_set])
+        result_set = ResultSet(refited_result_set)
         result = result_set.values()[0]  # There is only one
         result["key"] = self.get_signature()
         result["best_params"] = [dict(sig) for sig in key_split(best_key, eval=True)]

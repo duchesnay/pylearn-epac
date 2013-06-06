@@ -13,6 +13,15 @@ from sklearn.feature_selection import SelectKBest
 X, y = datasets.make_classification(n_samples=12, n_features=10,
                                     n_informative=2)
 
+run ../epac/workflow/base.py
+run ../epac/results.py
+
+from epac import CV, Methods
+cv = CV(Methods(LDA(), SVC(kernel="linear")))
+cv.fit_predict(X=X, y=y)
+self = cv
+print cv.reduce()
+
 # Build sequential Pipeline
 # -------------------------
 # 2  SelectKBest (Estimator)
