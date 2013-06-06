@@ -20,11 +20,15 @@ X, y = datasets.make_classification(n_samples=12, n_features=10, n_informative=2
 n_folds_nested = 2
 #random_state = 0
 C_values = [.1, 1, 2, 5, 10, 100]
-
+Xy = dict(X=X, y=y)
 # With EPAC
 methods = Methods(*[SVC(C=C, kernel="linear") for C in C_values])
 wf = CVBestSearchRefit(methods, n_folds=n_folds_nested)
 self = wf
+[c for c in self.children[0].children[0].children[0].children]
+cv = self.children[0]
+cv_result_set = cv.reduce(store_results=False)
+
 wf.fit_predict(X=X, y=y)
 r_epac = wf.reduce().values()[0]
 

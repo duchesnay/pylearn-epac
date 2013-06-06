@@ -49,10 +49,17 @@ class ResultSet(Set):
             return None
 
     def __repr__(self):
-        ret = ""
+        s = "["
+        cpt = 1
         for res in self.results:
-            ret += repr(res) + "\n"
-        return ret
+            if cpt == 1:
+                s += repr(res)
+            else:
+                s += " " + repr(res)
+            if cpt < len(self.results):
+                s += ",\n"
+            cpt += 1
+        return s+"]"
 
     def add(self, result):
         if result in self:
@@ -87,11 +94,14 @@ class Result(dict):
     PRED = "pred"
     TRUE = "true"
     SEP = "_"
+    PRINT_ORDER_REGEXP = ["key", ".*mean_score_te", ".*mean_score_tr", ".*score_te", ".*score_tr"]
 
-    def __init__(self, key, payload={}):
+    def __init__(self, key=None, **kwargs):
         #self["key"] = key
-        super(Result, self).__setitem__("key", key)
-        self.update(payload)
+        if key:
+            super(Result, self).__setitem__("key", key)
+        if dict:
+            self.update(kwargs)
 
     def key(self):
         return self["key"]
@@ -107,6 +117,18 @@ class Result(dict):
             arg_name = args[0]
         arg_val = args[1]
         super(Result, self).__setitem__(arg_name, arg_val)
+
+    def __repr__(self):
+        ordered_keys = _order_from_regexp(items=self.keys(), 
+                           order_regexps=Result.PRINT_ORDER_REGEXP)
+        s = "{"
+        cpt = 1
+        for k in ordered_keys:
+            s +=  "'%s': %s" % (k, self[k])
+            if cpt < len(ordered_keys):
+                s += ", "
+            cpt += 1
+        return s +"}"
 
     @classmethod
     def cat(self, *parts):
@@ -136,3 +158,44 @@ class Result(dict):
                 payload[k].append(result[k])
         payload.pop("key")
         return Result(key=key, payload=payload)
+
+def _order_from_regexp(items, order_regexps):
+    """Re-order list given regular expression listed by priorities
+
+    Example:
+    --------
+    >>> _order_from_regexp(["aA", "aZ", "bb", "bY", "cZ", "aY"], [".*Y", ".*Z"])
+    ['bY', 'aY', 'aZ', 'cZ', 'aA', 'bb']
+    """
+    import re
+    ordered = list()
+    for order_regexp in order_regexps:
+        matched =  [item for item in items if re.search(order_regexp, item)]
+        for item in matched:
+            ordered.append(item)
+            items.remove(item)
+    ordered += items
+    return ordered
+
+"""
+run /home/edouard/git/pylearn-epac/epac/results.py
+
+self = Result(**{'true_te': np.array([0, 1, 0, 1, 0, 1]), 'score_tr': 1.0, 'score_te': 0.16666666666666666, 'pred_te': np.array([1, 0, 1, 1, 1, 0]), 'key': 'CV(nb=1)/SVC(C=0.1)', 'mean_score_te': 0.25})
+print self
+#self = Result(**{'mean_score_te': 0.25, 'mean_score_tr': 1.0, 'key': 'SVC(C=5)'})
+
+keys = self.keys()
+ordered_keys = list()
+
+
+
+
+
+
+r1=Result(**{'true_te': np.array([0, 1, 0, 1, 0, 1]), 'score_tr': 1.0, 'score_te': 0.33333333333333331, 'mean_score_te': 0.33333333333333331, 'pred_te': np.array([1, 0, 1, 1, 0, 0]), 'key': 'CV(nb=1)/SVC(C=1)'})
+r2=Result(**{'true_te': np.array([0, 1, 0, 1, 0, 1]), 'score_tr': 1.0, 'score_te': 0.33333333333333331, 'pred_te': np.array([1, 0, 1, 1, 0, 0]), 'key': 'CV(nb=1)/SVC(C=2)'})
+r3=Result(**{'true_te': np.array([0, 1, 0, 1, 0, 1]), 'score_tr': 1.0, 'score_te': 0.33333333333333331, 'pred_te': np.array([1, 0, 1, 1, 0, 0]), 'key': 'CV(nb=1)/SVC(C=5)'})
+
+Result(**{'true_te': np.array([0, 1, 0, 1, 0, 1]), 'score_tr': 1.0, 'score_te': 0.33333333333333331, 'pred_te': np.array([1, 0, 1, 1, 0, 0]), 'key': 'CV(nb=1)/SVC(C=10)'})
+Result(**{'true_te': np.array([0, 1, 0, 1, 0, 1]), 'score_tr': 1.0, 'score_te': 0.33333333333333331, 'pred_te': np.array([1, 0, 1, 1, 0, 0]), 'key': 'CV(nb=1)/SVC(C=100)'})
+"""
