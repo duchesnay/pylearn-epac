@@ -55,7 +55,7 @@ class ResultSet(Set):
             return None
 
     def __repr__(self):
-        s = "["
+        s = "ResultSet(\n["
         cpt = 1
         for res in self.results:
             if cpt == 1:
@@ -65,7 +65,7 @@ class ResultSet(Set):
             if cpt < len(self.results):
                 s += ",\n"
             cpt += 1
-        return s+"]"
+        return s+"])"
 
     def add(self, result):
         if result in self:
@@ -91,7 +91,7 @@ class Result(dict):
     -------
     >>> from epac import Result
     >>> r1 = Result('SVC(C=1)', **dict(a=1, b=2))
-    >>> r2 = Result(**dict(key='SVC(C=10)', a=1, b=2))
+    >>> r2 = Result(key='SVC(C=10)', a=1, b=2)
     >>> r1["foo"] = "bar"
     >>> r1[Result.SCORE, Result.TRAIN] = 1.0
     """
@@ -143,28 +143,28 @@ class Result(dict):
         return self.SEP.join([str(part) for part in parts])
 
     @classmethod
-    def stack(self, result_list):
-        """Stack results list, test that all results have the same key.
+    def stack(self, *args):
+        """Stack results arguments, test that all results have the same key.
 
          Example
         -------
         >>> from epac import Result
-        >>> r1 = Result('SVC(C=1)', {'score_te': .5, 'score_tr': 1,})
-        >>> r2 = Result('SVC(C=1)', {'score_te': .25, 'score_tr': .75,})
-        >>> print Result.stack([r1, r2])
-        {'score_tr': [1, 0.75], 'score_te': [0.5, 0.25], 'key': 'SVC(C=1)'}
+        >>> r1 = Result(key='SVC(C=1)', score_te=.5, score_tr=1)
+        >>> r2 = Result(key='SVC(C=1)', score_te=.25, score_tr=.75)
+        >>> print Result.stack(r1, r2)
+        {'key': SVC(C=1), 'score_te': [0.5, 0.25], 'score_tr': [1, 0.75]}
         """
-        key = result_list[0].key()
-        payload = dict()
-        for k in result_list[0]:
-            payload[k] = list()
-        for result in result_list:
-            for k in payload:
+        key = args[0].key()
+        stacked = dict()
+        for k in args[0]:
+            stacked[k] = list()
+        for result in args:
+            for k in stacked:
                 if k == "key" and result[k] != key:
-                    raise KeyError("Stack results with differnet key")
-                payload[k].append(result[k])
-        payload.pop("key")
-        return Result(key=key, payload=payload)
+                    raise KeyError("Stack results with different key")
+                stacked[k].append(result[k])
+        stacked["key"] = key
+        return Result(**stacked)
 
 def _order_from_regexp(items, order_regexps):
     """Re-order list given regular expression listed by priorities
@@ -183,27 +183,3 @@ def _order_from_regexp(items, order_regexps):
             items.remove(item)
     ordered += items
     return ordered
-
-"""
-run /home/ed203246/git/pylearn-epac/epac/results.py
-
-self = Result(**{'true_te': np.array([0, 1, 0, 1, 0, 1]), 'score_tr': 1.0, 'score_te': 0.16666666666666666, 'pred_te': np.array([1, 0, 1, 1, 1, 0]), 'key': 'CV(nb=1)/SVC(C=0.1)', 'mean_score_te': 0.25})
-print self
-#self = Result(**{'mean_score_te': 0.25, 'mean_score_tr': 1.0, 'key': 'SVC(C=5)'})
-
-keys = self.keys()
-ordered_keys = list()
-
-
-
-
-
-import numpy as np
-r1=Result(**{'true_te': np.array([0, 1, 0, 1, 0, 1]), 'score_tr': 1.0, 'score_te': 0.33333333333333331, 'mean_score_te': 0.33333333333333331, 'pred_te': np.array([1, 0, 1, 1, 0, 0]), 'key': 'CV(nb=1)/SVC(C=1)'})
-r2=Result(**{'true_te': np.array([0, 1, 0, 1, 0, 1]), 'score_tr': 1.0, 'score_te': 0.33333333333333331, 'pred_te': np.array([1, 0, 1, 1, 0, 0]), 'key': 'CV(nb=1)/SVC(C=2)'})
-r3=Result(**{'true_te': np.array([0, 1, 0, 1, 0, 1]), 'score_tr': 1.0, 'score_te': 0.33333333333333331, 'pred_te': np.array([1, 0, 1, 1, 0, 0]), 'key': 'CV(nb=1)/SVC(C=5)'})
-
-
-Result(**{'true_te': np.array([0, 1, 0, 1, 0, 1]), 'score_tr': 1.0, 'score_te': 0.33333333333333331, 'pred_te': np.array([1, 0, 1, 1, 0, 0]), 'key': 'CV(nb=1)/SVC(C=10)'})
-Result(**{'true_te': np.array([0, 1, 0, 1, 0, 1]), 'score_tr': 1.0, 'score_te': 0.33333333333333331, 'pred_te': np.array([1, 0, 1, 1, 0, 0]), 'key': 'CV(nb=1)/SVC(C=100)'})
-"""

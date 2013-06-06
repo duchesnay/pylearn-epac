@@ -64,7 +64,7 @@ class BaseNodeSplitter(BaseNode):
         # For each key, stack results
         reduced = ResultSet()
         for key in groups:
-            result_stacked = Result.stack(groups[key])
+            result_stacked = Result.stack(*groups[key])
             reduced.add(self.reducer.reduce(result_stacked))
         return reduced
 

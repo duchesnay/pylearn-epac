@@ -111,7 +111,7 @@ class TestPerms(unittest.TestCase):
 
 class TestCVBestSearchRefit(unittest.TestCase):
 
-    def test2_cvgridsearchrefit(self):
+    def test_cvbestsearchrefit(self):
         X, y = datasets.make_classification(n_samples=12, n_features=10, n_informative=2)
         n_folds_nested = 2
         #random_state = 0
