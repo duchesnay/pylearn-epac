@@ -65,7 +65,7 @@ class TestPermCV(unittest.TestCase):
 
 class TestCVBestSearchRefit(unittest.TestCase):
 
-    def test_perm_cv_grid_vs_sklearn(self):
+    def todo_perm_cv_grid_vs_sklearn(self):
         X, y = datasets.make_classification(n_samples=100, n_features=500,
                                             n_informative=5)
         n_perms = 3
@@ -76,7 +76,8 @@ class TestCVBestSearchRefit(unittest.TestCase):
         C_values = [1, 10]
 
         # = With EPAC
-        pipelines = Methods(*[Pipe(SelectKBest(k=k), Methods(*[SVC(C=C) for C in C_values])) for k in k_values])
+        pipelines = Methods(*[Pipe(SelectKBest(k=k),
+                                   Methods(*[SVC(C=C, kernel="linear") for C in C_values])) for k in k_values])
         #print [n for n in pipelines.walk_leaves()]
         pipelines_cv = CVBestSearchRefit(pipelines,
                         sn_folds=n_folds_nested, random_state=random_state)
@@ -136,7 +137,7 @@ class TestCVBestSearchRefit(unittest.TestCase):
                     #np.mean(R2[key]['score_tr'][perm_nb])
             perm_nb += 1
 
-        # = Comparison
+        # - Comparisons
         shared_keys = set(r_epac.keys()).intersection(set(r_sklearn.keys()))
         comp = {k: np.all(np.asarray(r_epac[k]) == np.asarray(r_sklearn[k]))
                 for k in shared_keys}
